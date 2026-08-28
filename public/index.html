@@ -243,6 +243,12 @@
     .then(function (r) { return r.json(); })
     .then(function (cfg) {
       CONFIG = cfg;
+      if (cfg.meta && cfg.meta.isOpen === false) {
+        document.getElementById("screenRoot").innerHTML =
+          '<div class="center-note">' + tr(cfg.meta.closedMessage) + "</div>";
+        setProgress(100);
+        return;
+      }
       render();
     })
     .catch(function (err) {
