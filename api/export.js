@@ -18,7 +18,15 @@ module.exports = withHandler("GET", async (req, res) => {
   const records = await listRecords();
   const csv = buildCSV(records);
 
+  // Prepend a UTF-8 byte-order-mark. Without it, Excel doesn't reliably
+  // auto-detect UTF-8 CSVs and falls back to a different encoding,
+  // mangling any non-ASCII character (e.g. the en-dash in "18–24" or
+  // "6–12 months ago") into garbled text like "â€"". The BOM fixes
+  // this in Excel, Google Sheets, and Numbers without changing the
+  // actual data.
+  const csvWithBom = "\uFEFF" + csv;
+
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", 'attachment; filename="survey-responses.csv"');
-  res.status(200).send(csv);
+  res.status(200).send(csvWithBom);
 });
