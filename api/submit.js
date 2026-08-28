@@ -1,10 +1,18 @@
 // api/submit.js — thin wrapper: validate shape, score, save. No storage
 // or scoring logic lives here — see lib/scoring.js and lib/records.js.
 const { withHandler } = require("../lib/http");
+const config = require("../lib/survey-config");
 const { scoreSection4 } = require("../lib/scoring");
 const { saveRecord } = require("../lib/records");
 
 module.exports = withHandler("POST", async (req, res) => {
+  // This is the check that actually matters for "closing" the survey —
+  // hiding the UI alone wouldn't stop a direct POST to this endpoint.
+  if (config.meta && config.meta.isOpen === false) {
+    res.status(403).json({ error: "This survey is closed and is not accepting new responses." });
+    return;
+  }
+
   const body = req.body || {};
 
   const required = ["language", "demographics", "section2", "section3", "section4", "section5", "section6"];
