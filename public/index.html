@@ -733,16 +733,22 @@
     done: screenDone,
   };
 
+  // Tracks which "screen" was last rendered (step + Section 4 item
+  // cursor, since each item within section4_item counts as its own
+  // page). render() is also called on every option click just to
+  // reflect the "selected" highlight — that must NOT scroll. Only
+  // scroll when this key actually changes, i.e. a real page change
+  // (Back, Continue, or a custom jump).
+  var lastScreenKey = null;
+
   function render() {
     if (!CONFIG) return;
-    // Fix: previously the page never scrolled back to the top on
-    // Back/Continue, so on a long question (e.g. the platform-frequency
-    // matrix) the next screen could render with the viewport still
-    // scrolled halfway down. Every screen transition goes through
-    // render(), so this one line covers Back, Continue, and every
-    // custom jump uniformly.
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     var stepName = STEPS[stepIndex];
+    var screenKey = stepIndex + ":" + section4Cursor;
+    if (screenKey !== lastScreenKey) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      lastScreenKey = screenKey;
+    }
     var screenRoot = document.getElementById("screenRoot");
     screenRoot.innerHTML = "";
     setProgress(((stepIndex + 1) / STEPS.length) * 100);
