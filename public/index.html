@@ -211,7 +211,7 @@
   var section4Responses = []; // {itemId, token, judgment, reasonTags}
   var section4Cursor = 0;
 
-  var STEPS = ["age", "consent", "language", "section1", "section2", "section3",
+  var STEPS = ["language", "age", "consent", "section1", "section2", "section3",
     "section4_intro", "section4_item", "section5_ever", "section5_platforms",
     "section6_trust", "section6_narrative", "section7", "submitting", "done"];
   var stepIndex = 0;
@@ -276,6 +276,21 @@
     return node;
   }
   function text(str) { return document.createTextNode(str); }
+
+  // Bug fix: text/textarea inputs update `answers` on every keystroke
+  // WITHOUT calling render() (correctly — a full re-render would rebuild
+  // the textarea and throw away cursor position/focus). But that meant
+  // any Continue-button `disabled` condition depending on a text field
+  // was computed once at screen-render time and never refreshed as the
+  // person typed, leaving Continue stuck disabled (or stuck enabled)
+  // regardless of the current text. `currentNextButton` is set fresh by
+  // navButtons() on every render(); text-input screens call
+  // updateContinueDisabled() from their input handlers to keep the
+  // button in sync without touching the input element itself.
+  var currentNextButton = null;
+  function updateContinueDisabled(isDisabled) {
+    if (currentNextButton) currentNextButton.disabled = !!isDisabled;
+  }
 
   function setProgress(pct) {
     document.getElementById("progressFill").style.width = Math.max(2, Math.min(100, pct)) + "%";
@@ -361,22 +376,28 @@
     container.appendChild(block);
   }
 
-  function renderLongText(container, question, currentValue, onChange) {
+  function renderLongText(container, question, currentValue, onChange, onAfterChange) {
     var block = el("div", { class: "question-block" });
     block.appendChild(el("label", { class: "question-label" }, [text(tr(question.question))]));
     var ta = el("textarea", { rows: "4" });
     ta.value = currentValue || "";
-    ta.addEventListener("input", function () { onChange(ta.value); });
+    ta.addEventListener("input", function () {
+      onChange(ta.value);
+      if (onAfterChange) onAfterChange();
+    });
     block.appendChild(ta);
     container.appendChild(block);
   }
 
-  function renderShortText(container, question, currentValue, onChange) {
+  function renderShortText(container, question, currentValue, onChange, onAfterChange) {
     var block = el("div", { class: "question-block" });
     block.appendChild(el("label", { class: "question-label" }, [text(tr(question.question))]));
     var input = el("input", { type: "text" });
     input.value = currentValue || "";
-    input.addEventListener("input", function () { onChange(input.value); });
+    input.addEventListener("input", function () {
+      onChange(input.value);
+      if (onAfterChange) onAfterChange();
+    });
     block.appendChild(input);
     container.appendChild(block);
   }
@@ -429,6 +450,7 @@
     next.addEventListener("click", opts.onNext || goNext);
     row.appendChild(next);
     container.appendChild(row);
+    currentNextButton = next;
   }
 
   // ---------------------------------------------------------------
@@ -439,6 +461,7 @@
     root.appendChild(el("h2", {}, [text(tr(CONFIG.meta.title))]));
     renderSingleChoice(root, s, answers.ageAnswer, function (v) { answers.ageAnswer = v; });
     navButtons(root, {
+      showBack: true,
       disabled: !answers.ageAnswer,
       onNext: function () {
         if (answers.ageAnswer === s.failId) {
@@ -480,7 +503,7 @@
       list.appendChild(row);
     });
     root.appendChild(list);
-    navButtons(root, { showBack: true });
+    navButtons(root);
   }
 
   // ---------------------------------------------------------------
@@ -490,18 +513,22 @@
     var sec = CONFIG.section1;
     root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
     root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+    function isMissing() {
+      return sec.questions.some(function (q) {
+        var v = answers.demographics[q.id];
+        return q.type === "short_text" ? !(v && v.trim()) : !v;
+      });
+    }
     sec.questions.forEach(function (q) {
       if (q.type === "short_text") {
-        renderShortText(root, q, answers.demographics[q.id], function (v) { answers.demographics[q.id] = v; });
+        renderShortText(root, q, answers.demographics[q.id], function (v) { answers.demographics[q.id] = v; }, function () {
+          updateContinueDisabled(isMissing());
+        });
       } else {
         renderSingleChoice(root, q, answers.demographics[q.id], function (v) { answers.demographics[q.id] = v; });
       }
     });
-    var missing = sec.questions.some(function (q) {
-      var v = answers.demographics[q.id];
-      return q.type === "short_text" ? !(v && v.trim()) : !v;
-    });
-    navButtons(root, { showBack: true, disabled: missing });
+    navButtons(root, { showBack: true, disabled: isMissing() });
   }
 
   function screenSection2(root) {
@@ -520,7 +547,15 @@
         renderSingleChoice(root, q, answers.section2[q.id], function (v) { answers.section2[q.id] = v; });
       }
     });
-    navButtons(root, { showBack: true });
+    // Every single-choice question here is required (there's always a
+    // valid answer — Yes/No/Not sure, a frequency band, etc). The
+    // multi-select "which tools have you used" is deliberately left
+    // optional: it has no "None of these" option anymore, so leaving it
+    // blank is how someone who's used none of them completes the survey.
+    var missing = sec.questions.some(function (q) {
+      return q.type !== "multi_choice" && !answers.section2[q.id];
+    });
+    navButtons(root, { showBack: true, disabled: missing });
   }
 
   function screenSection3(root) {
@@ -529,8 +564,10 @@
     root.appendChild(el("h2", {}, [text(tr(sec.title))]));
     renderMatrix(root, sec.trustMatrix, answers.section3.trust, function (v) { answers.section3.trust = v; });
     renderMultiChoice(root, sec.newsSource, answers.section3.newsSource, function (v) { answers.section3.newsSource = v; });
+    var missingTrust = sec.trustMatrix.rows.some(function (row) { return !answers.section3.trust[row.id]; });
     navButtons(root, {
       showBack: true,
+      disabled: missingTrust,
       onNext: function () {
         // Fetch the randomized stimuli set right before Section 4 starts.
         var loadingRoot = document.getElementById("screenRoot");
@@ -632,7 +669,11 @@
     var sec = CONFIG.section5;
     root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
     renderMultiChoice(root, sec.platformsEncountered, answers.section5.platforms, function (v) { answers.section5.platforms = v; });
-    navButtons(root, { showBack: true });
+    // Required: this screen only shows up after answering "yes" to
+    // having encountered suspected AI content, so at least one
+    // platform must apply — unlike Section 2's tools question, there's
+    // no legitimate "none apply" case here.
+    navButtons(root, { showBack: true, disabled: !answers.section5.platforms || answers.section5.platforms.length === 0 });
   }
 
   // ---------------------------------------------------------------
@@ -643,15 +684,19 @@
     root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
     root.appendChild(el("h2", {}, [text(tr(sec.title))]));
     renderMatrix(root, sec.trustChange, answers.section6.trustChange, function (v) { answers.section6.trustChange = v; });
-    navButtons(root, { showBack: true });
+    var missing = sec.trustChange.rows.some(function (row) { return !answers.section6.trustChange[row.id]; });
+    navButtons(root, { showBack: true, disabled: missing });
   }
 
   function screenSection6Narrative(root) {
     var sec = CONFIG.section6;
-    renderLongText(root, sec.openNarrative, answers.section6.openNarrative, function (v) { answers.section6.openNarrative = v; });
-    var isRequired = sec.openNarrative.required;
-    var isEmpty = !answers.section6.openNarrative || !answers.section6.openNarrative.trim();
-    navButtons(root, { showBack: true, disabled: isRequired && isEmpty });
+    function isDisabled() {
+      return sec.openNarrative.required && (!answers.section6.openNarrative || !answers.section6.openNarrative.trim());
+    }
+    renderLongText(root, sec.openNarrative, answers.section6.openNarrative, function (v) { answers.section6.openNarrative = v; }, function () {
+      updateContinueDisabled(isDisabled());
+    });
+    navButtons(root, { showBack: true, disabled: isDisabled() });
   }
 
   function screenSection7(root) {
