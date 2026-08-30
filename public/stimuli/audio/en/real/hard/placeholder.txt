@@ -1,4 +1,0 @@
-This file exists only so GitHub/Git will keep this otherwise-empty
-folder. It is automatically ignored by the app (see lib/stimuli.js) and
-does NOT need to be deleted when you add real stimulus files here —
-just drop your real files in alongside it.
