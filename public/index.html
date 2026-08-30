@@ -577,6 +577,15 @@
           .then(function (data) {
             stimuliItems = data.items;
             section4Cursor = 0;
+            // Bug fix: a fresh fetch always means a brand-new randomized
+            // item set (different files, different tier/authenticity
+            // draws — not a same-items-different-language version of the
+            // last set). Any previously stored judgments/tokens refer to
+            // items that no longer exist in stimuliItems, so they must be
+            // discarded here — otherwise screenSection4Item would reuse a
+            // stale answer object tied to the OLD item's token while
+            // displaying the NEW item's content, corrupting scoring.
+            section4Responses = [];
             goNext(); // -> section4_intro
           });
       },
