@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Tanzania AI Content Survey</title>
+<style>
+  :root[data-theme="light"] {
+    --bg: #F5F6F8;
+    --card: #FFFFFF;
+    --fg: #1B2430;
+    --fg-muted: #5B6572;
+    --border: #DCE1E7;
+    --accent: #2F6F6D;
+    --accent-fg: #FFFFFF;
+    --danger: #B3432B;
+    --track: #E4E8EC;
+  }
+  :root[data-theme="dark"] {
+    --bg: #11161C;
+    --card: #182029;
+    --fg: #E7ECF1;
+    --fg-muted: #93A0AD;
+    --border: #2A3541;
+    --accent: #55B3AE;
+    --accent-fg: #0B1114;
+    --danger: #E08064;
+    --track: #232E39;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  h1, h2, h3 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.4em;
+    color: var(--fg);
+  }
+  .app-shell {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 18px 96px;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0 18px;
+  }
+  .brandmark {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    color: var(--fg-muted);
+  }
+  .theme-toggle {
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--fg);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .progress-track {
+    height: 4px;
+    background: var(--track);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 26px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.35s ease;
+    width: 2%;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 26px 22px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .section-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  p.lead { color: var(--fg-muted); font-size: 15px; }
+  .question-block { margin-bottom: 22px; }
+  .question-label { font-size: 15px; font-weight: 600; margin-bottom: 10px; display: block; }
+  .options-list { display: flex; flex-direction: column; gap: 8px; }
+  .option-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+    cursor: pointer;
+    font-size: 14.5px;
+    touch-action: manipulation;
+  }
+  .option-row:active { transform: scale(0.995); }
+  .option-row.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+  .option-row input { accent-color: var(--accent); width: 17px; height: 17px; flex-shrink: 0; }
+  .other-text-input { margin-top: 10px; }
+  textarea, input[type="text"] {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14.5px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: inherit;
+    resize: vertical;
+  }
+  textarea:focus, input:focus, .option-row:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .matrix-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .matrix-table th, .matrix-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--border); }
+  .matrix-table th { color: var(--fg-muted); font-weight: 500; font-size: 12px; }
+  .matrix-table td:first-child, .matrix-table th:first-child { text-align: left; font-weight: 500; }
+  .matrix-table input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .stimulus-box {
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 18px;
+    background: var(--bg);
+  }
+  .stimulus-box img { max-width: 100%; border-radius: 8px; display: block; }
+  .stimulus-box audio { width: 100%; }
+  .stimulus-text { font-size: 15px; white-space: pre-wrap; }
+  .tag-pill { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--track); color: var(--fg-muted); margin-bottom: 10px; }
+  .nav-row { display: flex; justify-content: space-between; gap: 10px; margin-top: 26px; }
+  button.primary, button.secondary {
+    border: none;
+    border-radius: 10px;
+    padding: 13px 22px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button.primary { background: var(--accent); color: var(--accent-fg); flex: 1; }
+  button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.secondary { background: transparent; color: var(--fg-muted); border: 1px solid var(--border); }
+  .warning-note { color: var(--danger); font-size: 13px; margin-top: 10px; }
+  .center-note { text-align: center; color: var(--fg-muted); font-size: 14px; padding: 40px 0; }
+  @media (max-width: 480px) {
+    .app-shell { padding: 16px 12px 90px; }
+    .card { padding: 20px 16px; border-radius: 10px; }
+    .matrix-table { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="topbar">
+    <div class="brandmark">AI &amp; Disinformation Study — Tanzania</div>
+    <button class="theme-toggle" id="themeToggle" type="button">🌙</button>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="card" id="screenRoot"><div class="center-note">Loading…</div></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Theme
+  // ---------------------------------------------------------------
+  var root = document.documentElement;
+  var savedTheme = localStorage.getItem("theme") || "light";
+  root.setAttribute("data-theme", savedTheme);
+  document.getElementById("themeToggle").textContent = savedTheme === "dark" ? "☀️" : "🌙";
+  document.getElementById("themeToggle").addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+    this.textContent = next === "dark" ? "☀️" : "🌙";
+  });
+
+  // ---------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------
+  var CONFIG = null;
+  var lang = "en";
+  var answers = {
+    demographics: {},
+    section2: {},
+    section3: { trust: {}, newsSource: [] },
+    section5: { everEncountered: null, platforms: [] },
+    section6: { trustChange: {}, openNarrative: "" },
+    section7: { finalComment: "" },
+  };
+  var stimuliItems = [];
+  var section4Responses = []; // {itemId, token, judgment, reasonTags}
+  var section4Cursor = 0;
+
+  var STEPS = ["language", "age", "consent", "section1", "section2", "section3",
+    "section4_intro", "section4_item", "section5_ever", "section5_platforms",
+    "section6_trust", "section6_narrative", "section7", "submitting", "done"];
+  var stepIndex = 0;
+
+  // -----------------------------------------------------------------
+  // Navigation: a proper history stack.
+  //
+  // Earlier versions of this file used ad hoc `stepIndex = STEPS.indexOf(...)`
+  // jumps for branches/skips (attention-check-free item cursors, the
+  // exposure yes/no skip, etc), while "Back" just did `stepIndex--`. That
+  // desynced from cursor state at every non-linear jump, which is why
+  // Back appeared to do nothing (or looped) right after those jumps.
+  //
+  // Fix: every forward transition — linear or a custom jump — pushes a
+  // snapshot of the state it's leaving onto `historyStack` first. Back
+  // always pops and restores that exact snapshot, so it's correct no
+  // matter how non-linear the forward path was.
+  // -----------------------------------------------------------------
+  var historyStack = [];
+
+  function snapshotState() {
+    return { stepIndex: stepIndex, section4Cursor: section4Cursor };
+  }
+  function restoreState(snap) {
+    stepIndex = snap.stepIndex;
+    section4Cursor = snap.section4Cursor;
+  }
+  function goNext() {
+    historyStack.push(snapshotState());
+    stepIndex++;
+    render();
+  }
+  function goToStep(name) {
+    historyStack.push(snapshotState());
+    stepIndex = STEPS.indexOf(name);
+    render();
+  }
+  function advanceSection4Item() {
+    historyStack.push(snapshotState());
+    section4Cursor++;
+    if (section4Cursor >= stimuliItems.length) {
+      stepIndex = STEPS.indexOf("section5_ever");
+    }
+    render();
+  }
+  function goBack() {
+    if (historyStack.length === 0) return;
+    restoreState(historyStack.pop());
+    render();
+  }
+
+  function tr(pair) { return pair ? pair[lang] || pair.en : ""; }
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") node.className = attrs[k];
+      else if (k === "html") node.innerHTML = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c) node.appendChild(c); });
+    return node;
+  }
+  function text(str) { return document.createTextNode(str); }
+
+  // Bug fix: text/textarea inputs update `answers` on every keystroke
+  // WITHOUT calling render() (correctly — a full re-render would rebuild
+  // the textarea and throw away cursor position/focus). But that meant
+  // any Continue-button `disabled` condition depending on a text field
+  // was computed once at screen-render time and never refreshed as the
+  // person typed, leaving Continue stuck disabled (or stuck enabled)
+  // regardless of the current text. `currentNextButton` is set fresh by
+  // navButtons() on every render(); text-input screens call
+  // updateContinueDisabled() from their input handlers to keep the
+  // button in sync without touching the input element itself.
+  var currentNextButton = null;
+  function updateContinueDisabled(isDisabled) {
+    if (currentNextButton) currentNextButton.disabled = !!isDisabled;
+  }
+
+  function setProgress(pct) {
+    document.getElementById("progressFill").style.width = Math.max(2, Math.min(100, pct)) + "%";
+  }
+
+  // ---------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------
+  fetch("/api/get-config")
+    .then(function (r) { return r.json(); })
+    .then(function (cfg) {
+      CONFIG = cfg;
+      if (cfg.meta && cfg.meta.isOpen === false) {
+        document.getElementById("screenRoot").innerHTML =
+          '<div class="center-note">' + tr(cfg.meta.closedMessage) + "</div>";
+        setProgress(100);
+        return;
+      }
+      render();
+    })
+    .catch(function (err) {
+      document.getElementById("screenRoot").innerHTML =
+        '<div class="center-note">Could not load the survey. Please refresh. (' + err.message + ")</div>";
+    });
+
+  // ---------------------------------------------------------------
+  // Generic question renderers
+  // ---------------------------------------------------------------
+  function renderSingleChoice(container, question, currentValue, onChange) {
+    var block = el("div", { class: "question-block" });
+    block.appendChild(el("label", { class: "question-label" }, [text(tr(question.question))]));
+    var list = el("div", { class: "options-list" });
+    question.options.forEach(function (opt) {
+      var row = el("label", { class: "option-row" + (currentValue === opt.id ? " selected" : "") });
+      var input = el("input", { type: "radio", name: question.id });
+      input.checked = currentValue === opt.id;
+      input.addEventListener("change", function () { onChange(opt.id); render(); });
+      row.appendChild(input);
+      row.appendChild(text(tr(opt.label) || opt.label));
+      list.appendChild(row);
+    });
+    block.appendChild(list);
+    container.appendChild(block);
+  }
+
+  // otherTextValue/onOtherTextChange are optional: pass them when
+  // question.allowOtherText is true so selecting the "other" option
+  // reveals a free-text field (used by Section 2's AI-tools question).
+  function renderMultiChoice(container, question, currentValues, onChange, otherTextValue, onOtherTextChange) {
+    currentValues = currentValues || [];
+    var block = el("div", { class: "question-block" });
+    block.appendChild(el("label", { class: "question-label" }, [text(tr(question.question))]));
+    var list = el("div", { class: "options-list" });
+    question.options.forEach(function (opt) {
+      var checked = currentValues.indexOf(opt.id) > -1;
+      var row = el("label", { class: "option-row" + (checked ? " selected" : "") });
+      var input = el("input", { type: "checkbox" });
+      input.checked = checked;
+      input.addEventListener("change", function () {
+        var next = currentValues.slice();
+        var idx = next.indexOf(opt.id);
+        if (idx > -1) next.splice(idx, 1); else next.push(opt.id);
+        onChange(next);
+        render();
+      });
+      row.appendChild(input);
+      row.appendChild(text(tr(opt.label) || opt.label));
+      list.appendChild(row);
+    });
+    block.appendChild(list);
+
+    if (question.allowOtherText && currentValues.indexOf("other") > -1 && onOtherTextChange) {
+      var otherInput = el("input", {
+        type: "text",
+        class: "other-text-input",
+        placeholder: lang === "sw" ? "Tafadhali eleza…" : "Please specify…",
+      });
+      otherInput.value = otherTextValue || "";
+      otherInput.addEventListener("input", function () { onOtherTextChange(otherInput.value); });
+      block.appendChild(otherInput);
+    }
+
+    container.appendChild(block);
+  }
+
+  function renderLongText(container, question, currentValue, onChange, onAfterChange) {
+    var block = el("div", { class: "question-block" });
+    block.appendChild(el("label", { class: "question-label" }, [text(tr(question.question))]));
+    var ta = el("textarea", { rows: "4" });
+    ta.value = currentValue || "";
+    ta.addEventListener("input", function () {
+      onChange(ta.value);
+      if (onAfterChange) onAfterChange();
+    });
+    block.appendChild(ta);
+    container.appendChild(block);
+  }
+
+  function renderShortText(container, question, currentValue, onChange, onAfterChange) {
+    var block = el("div", { class: "question-block" });
+    block.appendChild(el("label", { class: "question-label" }, [text(tr(question.question))]));
+    var input = el("input", { type: "text" });
+    input.value = currentValue || "";
+    input.addEventListener("input", function () {
+      onChange(input.value);
+      if (onAfterChange) onAfterChange();
+    });
+    block.appendChild(input);
+    container.appendChild(block);
+  }
+
+  function renderMatrix(container, matrixDef, currentValues, onChange) {
+    currentValues = currentValues || {};
+    var block = el("div", { class: "question-block" });
+    block.appendChild(el("label", { class: "question-label" }, [text(tr(matrixDef.question))]));
+    var wrap = el("div", { style: "overflow-x:auto" });
+    var table = el("table", { class: "matrix-table" });
+    var headRow = el("tr");
+    headRow.appendChild(el("th"));
+    matrixDef.columns.forEach(function (c) { headRow.appendChild(el("th", {}, [text(tr(c.label))])); });
+    table.appendChild(el("thead", {}, [headRow]));
+    var tbody = el("tbody");
+    matrixDef.rows.forEach(function (r) {
+      var tr_ = el("tr");
+      tr_.appendChild(el("td", {}, [text(tr(r.label))]));
+      matrixDef.columns.forEach(function (c) {
+        var td = el("td");
+        var input = el("input", { type: "radio", name: matrixDef.id + "_" + r.id });
+        input.checked = currentValues[r.id] === c.id;
+        input.addEventListener("change", function () {
+          var next = Object.assign({}, currentValues);
+          next[r.id] = c.id;
+          onChange(next);
+          render();
+        });
+        td.appendChild(input);
+        tr_.appendChild(td);
+      });
+      tbody.appendChild(tr_);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    block.appendChild(wrap);
+    container.appendChild(block);
+  }
+
+  function navButtons(container, opts) {
+    opts = opts || {};
+    var row = el("div", { class: "nav-row" });
+    if (opts.showBack) {
+      var back = el("button", { class: "secondary", type: "button" }, [text(lang === "sw" ? "Rudi" : "Back")]);
+      back.addEventListener("click", goBack);
+      row.appendChild(back);
+    }
+    var next = el("button", { class: "primary", type: "button" }, [text(opts.nextLabel || (lang === "sw" ? "Endelea" : "Continue"))]);
+    if (opts.disabled) next.disabled = true;
+    next.addEventListener("click", opts.onNext || goNext);
+    row.appendChild(next);
+    container.appendChild(row);
+    currentNextButton = next;
+  }
+
+  // ---------------------------------------------------------------
+  // Screen: age check
+  // ---------------------------------------------------------------
+  function screenAge(root) {
+    var s = CONFIG.section0.ageCheck;
+    root.appendChild(el("h2", {}, [text(tr(CONFIG.meta.title))]));
+    renderSingleChoice(root, s, answers.ageAnswer, function (v) { answers.ageAnswer = v; });
+    navButtons(root, {
+      showBack: true,
+      disabled: !answers.ageAnswer,
+      onNext: function () {
+        if (answers.ageAnswer === s.failId) {
+          answers._exitMessage = tr(s.exitMessage);
+          goToStep("done");
+        } else goNext();
+      },
+    });
+  }
+
+  function screenConsent(root) {
+    var s = CONFIG.section0.consent;
+    root.appendChild(el("h2", {}, [text(lang === "sw" ? "Kibali" : "Consent")]));
+    root.appendChild(el("p", { class: "lead" }, [text(tr(s.text))]));
+    renderSingleChoice(root, { id: "consent", question: { en: "", sw: "" }, options: s.options }, answers.consentAnswer, function (v) { answers.consentAnswer = v; });
+    navButtons(root, {
+      showBack: true,
+      disabled: !answers.consentAnswer,
+      onNext: function () {
+        if (answers.consentAnswer === s.failId) {
+          answers._exitMessage = lang === "sw" ? "Asante kwa muda wako." : "Thank you for your time.";
+          goToStep("done");
+        } else goNext();
+      },
+    });
+  }
+
+  function screenLanguage(root) {
+    var s = CONFIG.section0.languageChoice;
+    root.appendChild(el("h2", {}, [text(tr(s.question))]));
+    var list = el("div", { class: "options-list" });
+    s.options.forEach(function (opt) {
+      var row = el("label", { class: "option-row" + (lang === opt.id ? " selected" : "") });
+      var input = el("input", { type: "radio", name: "lang" });
+      input.checked = lang === opt.id;
+      input.addEventListener("change", function () { lang = opt.id; render(); });
+      row.appendChild(input);
+      row.appendChild(text(opt.label));
+      list.appendChild(row);
+    });
+    root.appendChild(list);
+    navButtons(root);
+  }
+
+  // ---------------------------------------------------------------
+  // Screen: generic "all questions in this section on one screen"
+  // ---------------------------------------------------------------
+  function screenSection1(root) {
+    var sec = CONFIG.section1;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+    function isMissing() {
+      return sec.questions.some(function (q) {
+        var v = answers.demographics[q.id];
+        return q.type === "short_text" ? !(v && v.trim()) : !v;
+      });
+    }
+    sec.questions.forEach(function (q) {
+      if (q.type === "short_text") {
+        renderShortText(root, q, answers.demographics[q.id], function (v) { answers.demographics[q.id] = v; }, function () {
+          updateContinueDisabled(isMissing());
+        });
+      } else {
+        renderSingleChoice(root, q, answers.demographics[q.id], function (v) { answers.demographics[q.id] = v; });
+      }
+    });
+    navButtons(root, { showBack: true, disabled: isMissing() });
+  }
+
+  function screenSection2(root) {
+    var sec = CONFIG.section2;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+    sec.questions.forEach(function (q) {
+      if (q.type === "multi_choice") {
+        renderMultiChoice(
+          root, q, answers.section2[q.id],
+          function (v) { answers.section2[q.id] = v; },
+          answers.section2[q.id + "_otherText"],
+          q.allowOtherText ? function (v) { answers.section2[q.id + "_otherText"] = v; } : undefined
+        );
+      } else {
+        renderSingleChoice(root, q, answers.section2[q.id], function (v) { answers.section2[q.id] = v; });
+      }
+    });
+    // Every single-choice question here is required (there's always a
+    // valid answer — Yes/No/Not sure, a frequency band, etc). The
+    // multi-select "which tools have you used" is deliberately left
+    // optional: it has no "None of these" option anymore, so leaving it
+    // blank is how someone who's used none of them completes the survey.
+    var missing = sec.questions.some(function (q) {
+      return q.type !== "multi_choice" && !answers.section2[q.id];
+    });
+    navButtons(root, { showBack: true, disabled: missing });
+  }
+
+  function screenSection3(root) {
+    var sec = CONFIG.section3;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+    renderMatrix(root, sec.trustMatrix, answers.section3.trust, function (v) { answers.section3.trust = v; });
+    renderMultiChoice(root, sec.newsSource, answers.section3.newsSource, function (v) { answers.section3.newsSource = v; });
+    var missingTrust = sec.trustMatrix.rows.some(function (row) { return !answers.section3.trust[row.id]; });
+    navButtons(root, {
+      showBack: true,
+      disabled: missingTrust,
+      onNext: function () {
+        // Fetch the randomized stimuli set right before Section 4 starts.
+        var loadingRoot = document.getElementById("screenRoot");
+        loadingRoot.innerHTML = '<div class="center-note">' + (lang === "sw" ? "Inapakia..." : "Loading…") + "</div>";
+        fetch("/api/get-stimuli-set?lang=" + lang)
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            stimuliItems = data.items;
+            section4Cursor = 0;
+            // Bug fix: a fresh fetch always means a brand-new randomized
+            // item set (different files, different tier/authenticity
+            // draws — not a same-items-different-language version of the
+            // last set). Any previously stored judgments/tokens refer to
+            // items that no longer exist in stimuliItems, so they must be
+            // discarded here — otherwise screenSection4Item would reuse a
+            // stale answer object tied to the OLD item's token while
+            // displaying the NEW item's content, corrupting scoring.
+            section4Responses = [];
+            goNext(); // -> section4_intro
+          });
+      },
+    });
+  }
+
+  function screenSection4Intro(root) {
+    var sec = CONFIG.section4;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+    root.appendChild(el("p", { class: "lead" }, [text(tr(sec.instructions))]));
+    navButtons(root, { showBack: true });
+  }
+
+  function screenSection4Item(root) {
+    var sec = CONFIG.section4;
+    var item = stimuliItems[section4Cursor];
+    if (!item) { goNext(); return; } // safety: no items left, move on
+
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title) + " · " + (section4Cursor + 1) + "/" + stimuliItems.length)]));
+
+    var box = el("div", { class: "stimulus-box" });
+    if (item.kind === "attention") {
+      box.appendChild(el("p", { class: "stimulus-text" }, [text(item.text)]));
+    } else {
+      box.appendChild(el("span", { class: "tag-pill" }, [text(item.modality.toUpperCase())]));
+      if (item.modality === "text") {
+        var textDiv = el("p", { class: "stimulus-text" }, [text(lang === "sw" ? "Inapakia maandishi…" : "Loading text…")]);
+        box.appendChild(textDiv);
+        fetch(item.url).then(function (r) { return r.text(); }).then(function (t) { textDiv.textContent = t; });
+      } else if (item.modality === "image") {
+        box.appendChild(el("img", { src: item.url, alt: "stimulus" }));
+      } else if (item.modality === "audio") {
+        var audio = el("audio", { controls: "true", src: item.url });
+        box.appendChild(audio);
+      }
+    }
+    root.appendChild(box);
+
+    var judgmentQ = { id: "judgment_" + item.itemId, question: sec.judgmentQuestion, options: sec.judgmentOptions };
+    var existing = section4Responses[section4Cursor] || { itemId: item.itemId, token: item.token, judgment: null, reasonTags: [] };
+    renderSingleChoice(root, judgmentQ, existing.judgment, function (v) {
+      existing.judgment = v;
+      section4Responses[section4Cursor] = existing;
+    });
+
+    if (item.kind === "detection") {
+      var reasonOptions = sec.reasonOptionsByModality[item.modality];
+      renderMultiChoice(root, { id: "reason_" + item.itemId, question: sec.reasonQuestion, options: reasonOptions }, existing.reasonTags, function (v) {
+        existing.reasonTags = v;
+        section4Responses[section4Cursor] = existing;
+      });
+    }
+
+    // Back is always shown now — the history stack correctly handles
+    // cursor 0 (returns to section4_intro) as well as every later item
+    // (returns to the previous item, cursor decremented), so the old
+    // manual DOM-rebinding hack for "back within this step" is gone.
+    navButtons(root, {
+      showBack: true,
+      disabled: !existing.judgment,
+      nextLabel: section4Cursor === stimuliItems.length - 1 ? (lang === "sw" ? "Maliza sehemu hii" : "Finish this section") : undefined,
+      onNext: advanceSection4Item,
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Section 5 — Exposure (simplified: one yes/no gate, one conditional
+  // platform multi-select — no per-category matrix or follow-ups)
+  // ---------------------------------------------------------------
+  function screenSection5Ever(root) {
+    var sec = CONFIG.section5;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+    renderSingleChoice(root, sec.everEncountered, answers.section5.everEncountered, function (v) { answers.section5.everEncountered = v; });
+    navButtons(root, {
+      showBack: true,
+      disabled: !answers.section5.everEncountered,
+      onNext: function () {
+        if (answers.section5.everEncountered === "no") {
+          goToStep("section6_trust"); // skip the platforms question entirely
+        } else {
+          goToStep("section5_platforms");
+        }
+      },
+    });
+  }
+
+  function screenSection5Platforms(root) {
+    var sec = CONFIG.section5;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    renderMultiChoice(root, sec.platformsEncountered, answers.section5.platforms, function (v) { answers.section5.platforms = v; });
+    // Required: this screen only shows up after answering "yes" to
+    // having encountered suspected AI content, so at least one
+    // platform must apply — unlike Section 2's tools question, there's
+    // no legitimate "none apply" case here.
+    navButtons(root, { showBack: true, disabled: !answers.section5.platforms || answers.section5.platforms.length === 0 });
+  }
+
+  // ---------------------------------------------------------------
+  // Section 6 — Consequences (trust-change matrix + required narrative)
+  // ---------------------------------------------------------------
+  function screenSection6Trust(root) {
+    var sec = CONFIG.section6;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+    renderMatrix(root, sec.trustChange, answers.section6.trustChange, function (v) { answers.section6.trustChange = v; });
+    var missing = sec.trustChange.rows.some(function (row) { return !answers.section6.trustChange[row.id]; });
+    navButtons(root, { showBack: true, disabled: missing });
+  }
+
+  function screenSection6Narrative(root) {
+    var sec = CONFIG.section6;
+    function isDisabled() {
+      return sec.openNarrative.required && (!answers.section6.openNarrative || !answers.section6.openNarrative.trim());
+    }
+    renderLongText(root, sec.openNarrative, answers.section6.openNarrative, function (v) { answers.section6.openNarrative = v; }, function () {
+      updateContinueDisabled(isDisabled());
+    });
+    navButtons(root, { showBack: true, disabled: isDisabled() });
+  }
+
+  function screenSection7(root) {
+    var sec = CONFIG.section7;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+    renderLongText(root, sec.optionalComment, answers.section7.finalComment, function (v) { answers.section7.finalComment = v; });
+    navButtons(root, {
+      showBack: true,
+      nextLabel: lang === "sw" ? "Wasilisha" : "Submit",
+      onNext: function () {
+        goToStep("submitting");
+        submitSurvey();
+      },
+    });
+  }
+
+  function submitSurvey() {
+    var payload = {
+      language: lang,
+      demographics: answers.demographics,
+      section2: answers.section2,
+      section3: answers.section3,
+      section4: { responses: section4Responses },
+      section5: answers.section5,
+      section6: answers.section6,
+      section7: answers.section7,
+    };
+    fetch("/api/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function () {
+        answers._exitMessage = tr(CONFIG.section7.thankYou);
+        goToStep("done");
+      })
+      .catch(function () {
+        var screenRoot = document.getElementById("screenRoot");
+        screenRoot.innerHTML = "";
+        screenRoot.appendChild(el("div", { class: "center-note" }, [
+          text(lang === "sw" ? "Imeshindwa kuwasilisha. Tafadhali jaribu tena." : "Submission failed. Please try again."),
+        ]));
+        var retryRow = el("div", { class: "nav-row" });
+        var retryBtn = el("button", { class: "primary", type: "button" }, [text(lang === "sw" ? "Jaribu Tena" : "Try Again")]);
+        retryBtn.addEventListener("click", submitSurvey);
+        retryRow.appendChild(retryBtn);
+        screenRoot.appendChild(retryRow);
+      });
+  }
+
+  function screenSubmitting(root) {
+    root.appendChild(el("div", { class: "center-note" }, [text(lang === "sw" ? "Inawasilisha…" : "Submitting…")]));
+  }
+
+  function screenDone(root) {
+    root.appendChild(el("div", { class: "center-note" }, [text(answers._exitMessage || "Thank you.")]));
+  }
+
+  // ---------------------------------------------------------------
+  // Router
+  // ---------------------------------------------------------------
+  var RENDERERS = {
+    age: screenAge,
+    consent: screenConsent,
+    language: screenLanguage,
+    section1: screenSection1,
+    section2: screenSection2,
+    section3: screenSection3,
+    section4_intro: screenSection4Intro,
+    section4_item: screenSection4Item,
+    section5_ever: screenSection5Ever,
+    section5_platforms: screenSection5Platforms,
+    section6_trust: screenSection6Trust,
+    section6_narrative: screenSection6Narrative,
+    section7: screenSection7,
+    submitting: screenSubmitting,
+    done: screenDone,
+  };
+
+  // Tracks which "screen" was last rendered (step + Section 4 item
+  // cursor, since each item within section4_item counts as its own
+  // page). render() is also called on every option click just to
+  // reflect the "selected" highlight — that must NOT scroll. Only
+  // scroll when this key actually changes, i.e. a real page change
+  // (Back, Continue, or a custom jump).
+  var lastScreenKey = null;
+
+  function render() {
+    if (!CONFIG) return;
+    var stepName = STEPS[stepIndex];
+    var screenKey = stepIndex + ":" + section4Cursor;
+    if (screenKey !== lastScreenKey) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      lastScreenKey = screenKey;
+    }
+    var screenRoot = document.getElementById("screenRoot");
+    screenRoot.innerHTML = "";
+    setProgress(((stepIndex + 1) / STEPS.length) * 100);
+    (RENDERERS[stepName] || function (r) { r.appendChild(el("div", { class: "center-note" }, [text("Unknown step")])); })(screenRoot);
+  }
+})();
+</script>
+</body>
+</html>
