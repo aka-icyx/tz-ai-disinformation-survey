@@ -1,0 +1,4 @@
+Kwa kutumia programu hiyo, mtumiaji anaweza kuchagua nchi anayokwenda, kununua kifurushi cha data na kukiwezesha kwa kutumia QR code au msimbo wa kuwezesha huduma hiyo, bila kulazimika kutoa SIM kadi iliyopo kwenye simu.
+
+Hatua hiyo inalenga kupunguza changamoto ambazo wasafiri hukutana nazo wanapokuwa nje ya nchi, ikiwamo gharama kubwa za huduma za roaming, usumbufu wa kutafuta SIM
+kadi ya nchi husika na kulazimika kusubiri katika maduka ya huduma za mawasiliano baada ya kuwasili.
