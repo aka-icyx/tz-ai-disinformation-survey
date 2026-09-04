@@ -627,17 +627,69 @@
 
     var judgmentQ = { id: "judgment_" + item.itemId, question: sec.judgmentQuestion, options: sec.judgmentOptions };
     var existing = section4Responses[section4Cursor] || { itemId: item.itemId, token: item.token, judgment: null, reasonTags: [] };
-    renderSingleChoice(root, judgmentQ, existing.judgment, function (v) {
-      existing.judgment = v;
-      section4Responses[section4Cursor] = existing;
+
+    // Bug fix: this screen previously used the shared renderSingleChoice/
+    // renderMultiChoice helpers, whose onChange handlers call the global
+    // render(). That's correct and desired on every OTHER screen (their
+    // content is cheap to rebuild), but here it meant clicking a judgment
+    // or reason option destroyed and rebuilt the whole screen — including
+    // the stimulus box above — causing text to refetch and flash "Loading
+    // text…", and silently resetting any in-progress audio playback back
+    // to 0. The fix below builds the same markup and behavior by hand,
+    // but updates only the clicked option's own highlight (and, for the
+    // judgment question, its sibling rows for mutual exclusivity) plus
+    // the Continue button — via updateContinueDisabled(), the same
+    // mechanism already used for live-validating text inputs — without
+    // ever calling render(). Genuine navigation to a different item still
+    // goes through advanceSection4Item()/goBack(), which DO call render()
+    // and correctly rebuild a fresh stimulus box for the new item.
+
+    var judgmentBlock = el("div", { class: "question-block" });
+    judgmentBlock.appendChild(el("label", { class: "question-label" }, [text(tr(judgmentQ.question))]));
+    var judgmentList = el("div", { class: "options-list" });
+    var judgmentRows = [];
+    judgmentQ.options.forEach(function (opt) {
+      var isSelected = existing.judgment === opt.id;
+      var row = el("label", { class: "option-row" + (isSelected ? " selected" : "") });
+      var input = el("input", { type: "radio", name: judgmentQ.id });
+      input.checked = isSelected;
+      input.addEventListener("change", function () {
+        existing.judgment = opt.id;
+        section4Responses[section4Cursor] = existing;
+        judgmentRows.forEach(function (r) { r.row.classList.toggle("selected", r.optId === opt.id); });
+        updateContinueDisabled(!existing.judgment);
+      });
+      row.appendChild(input);
+      row.appendChild(text(tr(opt.label) || opt.label));
+      judgmentRows.push({ row: row, optId: opt.id });
+      judgmentList.appendChild(row);
     });
+    judgmentBlock.appendChild(judgmentList);
+    root.appendChild(judgmentBlock);
 
     if (item.kind === "detection") {
       var reasonOptions = sec.reasonOptionsByModality[item.modality];
-      renderMultiChoice(root, { id: "reason_" + item.itemId, question: sec.reasonQuestion, options: reasonOptions }, existing.reasonTags, function (v) {
-        existing.reasonTags = v;
-        section4Responses[section4Cursor] = existing;
+      var reasonBlock = el("div", { class: "question-block" });
+      reasonBlock.appendChild(el("label", { class: "question-label" }, [text(tr(sec.reasonQuestion))]));
+      var reasonList = el("div", { class: "options-list" });
+      reasonOptions.forEach(function (opt) {
+        var isChecked = existing.reasonTags.indexOf(opt.id) > -1;
+        var row = el("label", { class: "option-row" + (isChecked ? " selected" : "") });
+        var input = el("input", { type: "checkbox" });
+        input.checked = isChecked;
+        input.addEventListener("change", function () {
+          var idx = existing.reasonTags.indexOf(opt.id);
+          if (idx > -1) existing.reasonTags.splice(idx, 1); else existing.reasonTags.push(opt.id);
+          section4Responses[section4Cursor] = existing;
+          row.classList.toggle("selected", existing.reasonTags.indexOf(opt.id) > -1);
+          // reasonTags never gates Continue (it's optional per the spec), so no updateContinueDisabled() call here.
+        });
+        row.appendChild(input);
+        row.appendChild(text(tr(opt.label) || opt.label));
+        reasonList.appendChild(row);
       });
+      reasonBlock.appendChild(reasonList);
+      root.appendChild(reasonBlock);
     }
 
     // Back is always shown now — the history stack correctly handles
