@@ -437,6 +437,81 @@
     container.appendChild(block);
   }
 
+  // ---------------------------------------------------------------
+  // Section 4 preloading — moves ALL the slow-network waiting to the
+  // single loading screen between Section 3 and Section 4, so every
+  // individual item afterward displays instantly regardless of
+  // connection speed. Text is fetched and cached in memory on the item
+  // object itself; images/audio are fetched via a throwaway
+  // Image()/Audio() probe purely to warm the browser's HTTP cache —
+  // the REAL <img>/<audio> elements created later by screenSection4Item
+  // are untouched by this and will simply resolve from cache.
+  // ---------------------------------------------------------------
+  function preloadStimuliContent(items, onProgress) {
+    var detectionItems = items.filter(function (it) { return it.kind === "detection"; });
+    var totalCount = detectionItems.length;
+    if (totalCount === 0) return Promise.resolve(); // degraded case: no populated stimuli to preload
+
+    var completedCount = 0;
+    var startedAt = Date.now();
+
+    function reportProgress() {
+      completedCount++;
+      var elapsedMs = Date.now() - startedAt;
+      var avgMsPerItem = elapsedMs / completedCount;
+      var remainingMs = avgMsPerItem * (totalCount - completedCount);
+      onProgress(completedCount, totalCount, remainingMs);
+    }
+
+    function preloadOne(item) {
+      var p;
+      if (item.modality === "text") {
+        p = fetch(item.url)
+          .then(function (r) { return r.text(); })
+          .then(function (t) { item._preloadedText = t; })
+          .catch(function () { item._preloadedText = null; }); // fall back to a live fetch later rather than hang here
+      } else if (item.modality === "image") {
+        p = new Promise(function (resolve) {
+          var img = new Image();
+          img.onload = resolve;
+          img.onerror = resolve; // don't block the whole preload on one broken/slow file
+          img.src = item.url;
+        });
+      } else if (item.modality === "audio") {
+        p = new Promise(function (resolve) {
+          var audio = new Audio();
+          audio.preload = "auto";
+          audio.oncanplaythrough = resolve;
+          audio.onerror = resolve;
+          audio.src = item.url;
+          audio.load();
+        });
+      } else {
+        p = Promise.resolve();
+      }
+      return p.then(reportProgress);
+    }
+
+    return Promise.all(detectionItems.map(preloadOne));
+  }
+
+  // Formats a remaining-time estimate per the requested rounding rule:
+  // under a minute -> whole seconds; a minute or more -> nearest half-minute.
+  function formatLoadingEstimate(remainingMs, lang) {
+    var totalSeconds = remainingMs / 1000;
+    if (totalSeconds < 60) {
+      var seconds = Math.max(1, Math.round(totalSeconds));
+      return lang === "sw"
+        ? "(Hii inaweza kuchukua hadi sekunde " + seconds + ". Tafadhali subiri.)"
+        : "(This may take up to " + seconds + " second" + (seconds === 1 ? "" : "s") + ". Please wait.)";
+    }
+    var minutes = Math.round((totalSeconds / 60) * 2) / 2; // nearest 0.5 minute
+    var minuteWord = lang === "sw" ? "dakika" : (minutes === 1 ? "minute" : "minutes");
+    return lang === "sw"
+      ? "(Hii inaweza kuchukua hadi " + minutes + " " + minuteWord + ". Tafadhali subiri.)"
+      : "(This may take up to " + minutes + " " + minuteWord + ". Please wait.)";
+  }
+
   function navButtons(container, opts) {
     opts = opts || {};
     var row = el("div", { class: "nav-row" });
@@ -569,9 +644,21 @@
       showBack: true,
       disabled: missingTrust,
       onNext: function () {
-        // Fetch the randomized stimuli set right before Section 4 starts.
-        var loadingRoot = document.getElementById("screenRoot");
-        loadingRoot.innerHTML = '<div class="center-note">' + (lang === "sw" ? "Inapakia..." : "Loading…") + "</div>";
+        // Fetch the randomized stimuli set, then PRELOAD every item's
+        // actual content (not just its URL) before advancing — this is
+        // what moves all the slow-network waiting to this one screen,
+        // so every individual item afterward displays instantly. The
+        // estimate message refines itself as real items complete,
+        // rather than showing one fixed guess.
+        var screenRootEl = document.getElementById("screenRoot");
+        screenRootEl.innerHTML = "";
+        var loadingNote = el("div", { class: "center-note" });
+        var mainLine = el("div", {}, [text(lang === "sw" ? "Inapakia..." : "Loading…")]);
+        var estimateLine = el("div", { style: "margin-top:8px; font-size:13px;" });
+        loadingNote.appendChild(mainLine);
+        loadingNote.appendChild(estimateLine);
+        screenRootEl.appendChild(loadingNote);
+
         fetch("/api/get-stimuli-set?lang=" + lang)
           .then(function (r) { return r.json(); })
           .then(function (data) {
@@ -586,7 +673,13 @@
             // stale answer object tied to the OLD item's token while
             // displaying the NEW item's content, corrupting scoring.
             section4Responses = [];
-            goNext(); // -> section4_intro
+
+            return preloadStimuliContent(stimuliItems, function (completedCount, totalCount, remainingMs) {
+              estimateLine.textContent = formatLoadingEstimate(remainingMs, lang);
+            });
+          })
+          .then(function () {
+            goNext(); // -> section4_intro, with everything already cached
           });
       },
     });
@@ -613,9 +706,22 @@
     } else {
       box.appendChild(el("span", { class: "tag-pill" }, [text(item.modality.toUpperCase())]));
       if (item.modality === "text") {
-        var textDiv = el("p", { class: "stimulus-text" }, [text(lang === "sw" ? "Inapakia maandishi…" : "Loading text…")]);
+        var hasPreloaded = item._preloadedText !== undefined && item._preloadedText !== null;
+        var textDiv = el("p", { class: "stimulus-text" }, [
+          text(hasPreloaded ? item._preloadedText : (lang === "sw" ? "Inapakia maandishi…" : "Loading text…")),
+        ]);
         box.appendChild(textDiv);
-        fetch(item.url).then(function (r) { return r.text(); }).then(function (t) { textDiv.textContent = t; });
+        if (!hasPreloaded) {
+          // Safety net only — normally every item was already preloaded
+          // during the Section 3 -> Section 4 transition, so this fetch
+          // shouldn't fire in practice. It exists so a single item that
+          // somehow failed to preload still degrades to the old
+          // live-fetch behavior instead of getting stuck on "Loading…".
+          fetch(item.url).then(function (r) { return r.text(); }).then(function (t) {
+            item._preloadedText = t;
+            textDiv.textContent = t;
+          });
+        }
       } else if (item.modality === "image") {
         box.appendChild(el("img", { src: item.url, alt: "stimulus" }));
       } else if (item.modality === "audio") {
