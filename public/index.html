@@ -438,74 +438,38 @@
   }
 
   // ---------------------------------------------------------------
-  // Section 4 preloading — moves ALL the slow-network waiting to the
-  // single loading screen between Section 3 and Section 4, so every
-  // individual item afterward displays instantly regardless of
-  // connection speed. Text is fetched and cached in memory on the item
-  // object itself; images/audio are fetched via a throwaway
-  // Image()/Audio() probe purely to warm the browser's HTTP cache —
-  // the REAL <img>/<audio> elements created later by screenSection4Item
-  // are untouched by this and will simply resolve from cache.
+  // Section 4 preloading — this is the ONLY place preloading happens.
+  // Every item's actual content is fetched/warmed BEFORE the person ever
+  // sees Section 4, so every individual item afterward displays
+  // instantly regardless of connection speed. Text is fetched and
+  // cached in memory on the item object itself; images/audio are warmed
+  // into the browser's HTTP cache via a throwaway Image()/Audio() probe
+  // — the REAL <img>/<audio> elements created later by
+  // screenSection4Item are untouched by this and simply resolve from
+  // cache. No timing/estimate tracking here — the caller shows one
+  // fixed "this may take a while" message instead.
   // ---------------------------------------------------------------
-  function preloadStimuliContent(items, onProgress) {
+  function preloadStimuliContent(items) {
     var detectionItems = items.filter(function (it) { return it.kind === "detection"; });
-    var totalCount = detectionItems.length;
-    if (totalCount === 0) return Promise.resolve(); // degraded case: no populated stimuli to preload
-
-    // Bug fix: the original estimate was a single blended average across
-    // ALL completed items regardless of type. Text files are tiny and
-    // finish almost immediately; image and especially audio files are
-    // much larger and take real time. Since all 9 requests fire in
-    // parallel, the first completions are nearly always the small text
-    // files — so the blended average got computed from mostly-fast
-    // samples while slower audio/image files hadn't reported in yet,
-    // producing wildly optimistic numbers (observed: "1 second" shown
-    // when the real total was 8-11 seconds). Fix: track completion times
-    // SEPARATELY per modality, and don't show ANY estimate until every
-    // modality actually present has reported at least one completion —
-    // so a batch of fast text completions can never masquerade as
-    // information about how long the slower media types will take.
-    var totalByModality = {};
-    detectionItems.forEach(function (it) {
-      totalByModality[it.modality] = (totalByModality[it.modality] || 0) + 1;
-    });
-    var modalities = Object.keys(totalByModality);
-    var doneByModality = {};
-    var sumElapsedByModality = {};
-    modalities.forEach(function (m) { doneByModality[m] = 0; sumElapsedByModality[m] = 0; });
-
-    var completedCount = 0;
-    var startedAt = Date.now();
-
-    function computeRemainingMs() {
-      var allModalitiesHaveData = modalities.every(function (m) { return doneByModality[m] > 0; });
-      if (!allModalitiesHaveData) return null; // not enough information yet — caller shows plain "Loading…"
-
-      var maxRemaining = 0;
-      modalities.forEach(function (m) {
-        var avgForThisModality = sumElapsedByModality[m] / doneByModality[m];
-        var remainingForThisModality = avgForThisModality * (totalByModality[m] - doneByModality[m]);
-        if (remainingForThisModality > maxRemaining) maxRemaining = remainingForThisModality;
-      });
-      return maxRemaining;
-    }
+    if (detectionItems.length === 0) return Promise.resolve(); // degraded case: no populated stimuli to preload
 
     function preloadOne(item) {
-      var p;
       if (item.modality === "text") {
-        p = fetch(item.url)
+        return fetch(item.url)
           .then(function (r) { return r.text(); })
           .then(function (t) { item._preloadedText = t; })
           .catch(function () { item._preloadedText = null; }); // fall back to a live fetch later rather than hang here
-      } else if (item.modality === "image") {
-        p = new Promise(function (resolve) {
+      }
+      if (item.modality === "image") {
+        return new Promise(function (resolve) {
           var img = new Image();
           img.onload = resolve;
           img.onerror = resolve; // don't block the whole preload on one broken/slow file
           img.src = item.url;
         });
-      } else if (item.modality === "audio") {
-        p = new Promise(function (resolve) {
+      }
+      if (item.modality === "audio") {
+        return new Promise(function (resolve) {
           var audio = new Audio();
           audio.preload = "auto";
           audio.oncanplaythrough = resolve;
@@ -513,36 +477,11 @@
           audio.src = item.url;
           audio.load();
         });
-      } else {
-        p = Promise.resolve();
       }
-      return p.then(function () {
-        completedCount++;
-        var elapsedMs = Date.now() - startedAt;
-        doneByModality[item.modality]++;
-        sumElapsedByModality[item.modality] += elapsedMs;
-        onProgress(completedCount, totalCount, computeRemainingMs());
-      });
+      return Promise.resolve();
     }
 
     return Promise.all(detectionItems.map(preloadOne));
-  }
-
-  // Formats a remaining-time estimate per the requested rounding rule:
-  // under a minute -> whole seconds; a minute or more -> nearest half-minute.
-  function formatLoadingEstimate(remainingMs, lang) {
-    var totalSeconds = remainingMs / 1000;
-    if (totalSeconds < 60) {
-      var seconds = Math.max(1, Math.round(totalSeconds));
-      return lang === "sw"
-        ? "(Hii inaweza kuchukua hadi sekunde " + seconds + ". Tafadhali subiri.)"
-        : "(This may take up to " + seconds + " second" + (seconds === 1 ? "" : "s") + ". Please wait.)";
-    }
-    var minutes = Math.round((totalSeconds / 60) * 2) / 2; // nearest 0.5 minute
-    var minuteWord = lang === "sw" ? "dakika" : (minutes === 1 ? "minute" : "minutes");
-    return lang === "sw"
-      ? "(Hii inaweza kuchukua hadi " + minutes + " " + minuteWord + ". Tafadhali subiri.)"
-      : "(This may take up to " + minutes + " " + minuteWord + ". Please wait.)";
   }
 
   function navButtons(container, opts) {
@@ -681,15 +620,24 @@
         // actual content (not just its URL) before advancing — this is
         // what moves all the slow-network waiting to this one screen,
         // so every individual item afterward displays instantly. The
-        // estimate message refines itself as real items complete,
-        // rather than showing one fixed guess.
+        // message below is a fixed, honest range rather than a live
+        // calculation — real-world testing showed a computed estimate
+        // couldn't be made reliably accurate, so a simple fixed message
+        // is clearer and more trustworthy than a number that might be
+        // wrong.
         var screenRootEl = document.getElementById("screenRoot");
         screenRootEl.innerHTML = "";
         var loadingNote = el("div", { class: "center-note" });
         var mainLine = el("div", {}, [text(lang === "sw" ? "Inapakia..." : "Loading…")]);
-        var estimateLine = el("div", { style: "margin-top:8px; font-size:13px;" });
+        var subLine = el("div", { style: "margin-top:8px; font-size:13px;" }, [
+          text(
+            lang === "sw"
+              ? "Kupakia huku kwa kawaida huchukua chini ya sekunde 30, lakini kunaweza kuchukua hadi dakika 2, kutegemea na mtandao wako."
+              : "This loading usually takes less than 30 seconds, but may take up to 2 minutes, depending on your internet connection."
+          ),
+        ]);
         loadingNote.appendChild(mainLine);
-        loadingNote.appendChild(estimateLine);
+        loadingNote.appendChild(subLine);
         screenRootEl.appendChild(loadingNote);
 
         fetch("/api/get-stimuli-set?lang=" + lang)
@@ -707,9 +655,7 @@
             // displaying the NEW item's content, corrupting scoring.
             section4Responses = [];
 
-            return preloadStimuliContent(stimuliItems, function (completedCount, totalCount, remainingMs) {
-              estimateLine.textContent = remainingMs === null ? "" : formatLoadingEstimate(remainingMs, lang);
-            });
+            return preloadStimuliContent(stimuliItems);
           })
           .then(function () {
             goNext(); // -> section4_intro, with everything already cached
