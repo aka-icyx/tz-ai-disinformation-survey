@@ -452,15 +452,42 @@
     var totalCount = detectionItems.length;
     if (totalCount === 0) return Promise.resolve(); // degraded case: no populated stimuli to preload
 
+    // Bug fix: the original estimate was a single blended average across
+    // ALL completed items regardless of type. Text files are tiny and
+    // finish almost immediately; image and especially audio files are
+    // much larger and take real time. Since all 9 requests fire in
+    // parallel, the first completions are nearly always the small text
+    // files — so the blended average got computed from mostly-fast
+    // samples while slower audio/image files hadn't reported in yet,
+    // producing wildly optimistic numbers (observed: "1 second" shown
+    // when the real total was 8-11 seconds). Fix: track completion times
+    // SEPARATELY per modality, and don't show ANY estimate until every
+    // modality actually present has reported at least one completion —
+    // so a batch of fast text completions can never masquerade as
+    // information about how long the slower media types will take.
+    var totalByModality = {};
+    detectionItems.forEach(function (it) {
+      totalByModality[it.modality] = (totalByModality[it.modality] || 0) + 1;
+    });
+    var modalities = Object.keys(totalByModality);
+    var doneByModality = {};
+    var sumElapsedByModality = {};
+    modalities.forEach(function (m) { doneByModality[m] = 0; sumElapsedByModality[m] = 0; });
+
     var completedCount = 0;
     var startedAt = Date.now();
 
-    function reportProgress() {
-      completedCount++;
-      var elapsedMs = Date.now() - startedAt;
-      var avgMsPerItem = elapsedMs / completedCount;
-      var remainingMs = avgMsPerItem * (totalCount - completedCount);
-      onProgress(completedCount, totalCount, remainingMs);
+    function computeRemainingMs() {
+      var allModalitiesHaveData = modalities.every(function (m) { return doneByModality[m] > 0; });
+      if (!allModalitiesHaveData) return null; // not enough information yet — caller shows plain "Loading…"
+
+      var maxRemaining = 0;
+      modalities.forEach(function (m) {
+        var avgForThisModality = sumElapsedByModality[m] / doneByModality[m];
+        var remainingForThisModality = avgForThisModality * (totalByModality[m] - doneByModality[m]);
+        if (remainingForThisModality > maxRemaining) maxRemaining = remainingForThisModality;
+      });
+      return maxRemaining;
     }
 
     function preloadOne(item) {
@@ -489,7 +516,13 @@
       } else {
         p = Promise.resolve();
       }
-      return p.then(reportProgress);
+      return p.then(function () {
+        completedCount++;
+        var elapsedMs = Date.now() - startedAt;
+        doneByModality[item.modality]++;
+        sumElapsedByModality[item.modality] += elapsedMs;
+        onProgress(completedCount, totalCount, computeRemainingMs());
+      });
     }
 
     return Promise.all(detectionItems.map(preloadOne));
@@ -675,7 +708,7 @@
             section4Responses = [];
 
             return preloadStimuliContent(stimuliItems, function (completedCount, totalCount, remainingMs) {
-              estimateLine.textContent = formatLoadingEstimate(remainingMs, lang);
+              estimateLine.textContent = remainingMs === null ? "" : formatLoadingEstimate(remainingMs, lang);
             });
           })
           .then(function () {
