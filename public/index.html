@@ -860,7 +860,21 @@
     });
   }
 
+  var submitAttemptCount = 0;
+
   function submitSurvey() {
+    submitAttemptCount++;
+    // Bug fix: clicking "Try Again" correctly fired a new request, but
+    // gave ZERO visual feedback between the click and the (possibly
+    // identical) failure screen reappearing — if the underlying cause
+    // hadn't been fixed yet, a genuinely-working retry looked exactly
+    // like a dead button. Showing "Submitting…" immediately, and
+    // labeling which attempt failed if it does, makes every click's
+    // effect visible regardless of the outcome.
+    var screenRoot = document.getElementById("screenRoot");
+    screenRoot.innerHTML = "";
+    screenRoot.appendChild(el("div", { class: "center-note" }, [text(lang === "sw" ? "Inawasilisha…" : "Submitting…")]));
+
     var payload = {
       language: lang,
       demographics: answers.demographics,
@@ -905,12 +919,13 @@
       })
       .catch(function (err) {
         // eslint-disable-next-line no-console
-        console.error("[submit] submission failed:", err && err.message);
-        var screenRoot = document.getElementById("screenRoot");
+        console.error("[submit] submission failed (attempt " + submitAttemptCount + "):", err && err.message);
         screenRoot.innerHTML = "";
-        screenRoot.appendChild(el("div", { class: "center-note" }, [
-          text(lang === "sw" ? "Imeshindwa kuwasilisha. Tafadhali jaribu tena." : "Submission failed. Please try again."),
-        ]));
+        var failureText =
+          lang === "sw"
+            ? "Imeshindwa kuwasilisha (jaribio la " + submitAttemptCount + "). Tafadhali jaribu tena."
+            : "Submission failed (attempt " + submitAttemptCount + "). Please try again.";
+        screenRoot.appendChild(el("div", { class: "center-note" }, [text(failureText)]));
         var retryRow = el("div", { class: "nav-row" });
         var retryBtn = el("button", { class: "primary", type: "button" }, [text(lang === "sw" ? "Jaribu Tena" : "Try Again")]);
         retryBtn.addEventListener("click", submitSurvey);
