@@ -871,17 +871,41 @@
       section6: answers.section6,
       section7: answers.section7,
     };
+    // Bug fix: fetch() only rejects the promise on a NETWORK failure
+    // (DNS, connection refused, etc.) — it does NOT reject on HTTP error
+    // statuses like 403/500. The previous code called r.json() and then
+    // unconditionally showed "Thank you", regardless of whether the
+    // parsed body actually said { success: true } or { error: "..." }.
+    // That meant any server-side failure (a missing/expired Drive
+    // credential, a closed survey, anything api/submit.js could throw)
+    // would be silently swallowed — the person would see a completed,
+    // reassuring "Thank you" screen even though nothing was saved. Now
+    // both the HTTP status and the parsed body are checked before ever
+    // showing that screen; anything else falls through to the same
+    // "Submission failed, please try again" UI as a genuine network
+    // failure, with a working Retry button, so a failed submission is
+    // never silently lost from the person's perspective.
     fetch("/api/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json().then(function (data) {
+          if (!r.ok || !data || data.success !== true) {
+            var message = data && data.error ? data.error : "Server returned status " + r.status;
+            throw new Error(message);
+          }
+          return data;
+        });
+      })
       .then(function () {
         answers._exitMessage = tr(CONFIG.section7.thankYou);
         goToStep("done");
       })
-      .catch(function () {
+      .catch(function (err) {
+        // eslint-disable-next-line no-console
+        console.error("[submit] submission failed:", err && err.message);
         var screenRoot = document.getElementById("screenRoot");
         screenRoot.innerHTML = "";
         screenRoot.appendChild(el("div", { class: "center-note" }, [
