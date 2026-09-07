@@ -803,7 +803,12 @@
       disabled: !answers.section5.everEncountered,
       onNext: function () {
         if (answers.section5.everEncountered === "no") {
-          goToStep("section6_trust"); // skip the platforms question entirely
+          // Per the updated question set: Section 6 (both the trust-change
+          // matrix AND the narrative) is now ALSO shown only for "Yes"
+          // responses in 5.1 — not just the platforms question (5.2). A
+          // "no" answer here must skip Section 6 entirely and go straight
+          // to the closing section.
+          goToStep("section7");
         } else {
           goToStep("section5_platforms");
         }
