@@ -803,12 +803,12 @@
       disabled: !answers.section5.everEncountered,
       onNext: function () {
         if (answers.section5.everEncountered === "no") {
-          // Per the updated question set: Section 6 (both the trust-change
-          // matrix AND the narrative) is now ALSO shown only for "Yes"
-          // responses in 5.1 — not just the platforms question (5.2). A
-          // "no" answer here must skip Section 6 entirely and go straight
-          // to the closing section.
-          goToStep("section7");
+          // Per the latest question set revision: ONLY 6.1 (the
+          // trust-change matrix) is conditional on 5.1="yes" — 6.2 (the
+          // narrative) is unconditional and always compulsory, same as
+          // 5.2 (platforms) is conditional. So a "no" answer skips 5.2
+          // AND 6.1, but must still land on 6.2, not skip past it.
+          goToStep("section6_narrative");
         } else {
           goToStep("section5_platforms");
         }
@@ -841,6 +841,12 @@
 
   function screenSection6Narrative(root) {
     var sec = CONFIG.section6;
+    // The eyebrow is shown here (not just on screenSection6Trust) because
+    // this screen can now be reached directly — a "no" answer to 5.1
+    // skips straight here, bypassing screenSection6Trust entirely, so
+    // this can be the FIRST Section 6 screen a respondent sees. Same
+    // pattern already used by screenSection5Platforms for the same reason.
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
     function isDisabled() {
       return sec.openNarrative.required && (!answers.section6.openNarrative || !answers.section6.openNarrative.trim());
     }
