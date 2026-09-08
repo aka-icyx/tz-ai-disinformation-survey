@@ -733,27 +733,26 @@
     judgmentBlock.appendChild(el("label", { class: "question-label" }, [text(tr(judgmentQ.question))]));
     var judgmentList = el("div", { class: "options-list" });
     var judgmentRows = [];
-    judgmentQ.options.forEach(function (opt) {
-      var isSelected = existing.judgment === opt.id;
-      var row = el("label", { class: "option-row" + (isSelected ? " selected" : "") });
-      var input = el("input", { type: "radio", name: judgmentQ.id });
-      input.checked = isSelected;
-      input.addEventListener("change", function () {
-        existing.judgment = opt.id;
-        section4Responses[section4Cursor] = existing;
-        judgmentRows.forEach(function (r) { r.row.classList.toggle("selected", r.optId === opt.id); });
-        updateContinueDisabled(!existing.judgment);
-      });
-      row.appendChild(input);
-      row.appendChild(text(tr(opt.label) || opt.label));
-      judgmentRows.push({ row: row, optId: opt.id });
-      judgmentList.appendChild(row);
-    });
-    judgmentBlock.appendChild(judgmentList);
-    root.appendChild(judgmentBlock);
 
-    if (item.kind === "detection") {
-      var reasonOptions = sec.reasonOptionsByModality[item.modality];
+    // The reason question now depends on WHICH judgment was picked (the
+    // option wording differs for "why do you think this is real" vs "why
+    // do you think this is AI"), and must stay hidden until a judgment is
+    // chosen at all. reasonContainer is a stable, empty wrapper appended
+    // to the page once; renderReasonBlock() clears and rebuilds only
+    // ITS contents whenever the judgment changes — the stimulus box
+    // above is a separate sibling element and is never touched by this,
+    // preserving the no-refetch/no-playback-reset fix above.
+    var reasonContainer = el("div");
+
+    function renderReasonBlock() {
+      reasonContainer.innerHTML = "";
+      if (item.kind !== "detection") return; // attention checks never have a reason question
+      if (!existing.judgment) return; // nothing selected yet — stay hidden entirely
+
+      var judgmentKey = existing.judgment === "ai_generated" ? "ai" : "real";
+      var reasonOptions = sec.reasonOptionsByModality[item.modality][judgmentKey];
+      if (!reasonOptions) return; // defensive guard; should not happen given the config's shape
+
       var reasonBlock = el("div", { class: "question-block" });
       reasonBlock.appendChild(el("label", { class: "question-label" }, [text(tr(sec.reasonQuestion))]));
       var reasonList = el("div", { class: "options-list" });
@@ -774,8 +773,35 @@
         reasonList.appendChild(row);
       });
       reasonBlock.appendChild(reasonList);
-      root.appendChild(reasonBlock);
+      reasonContainer.appendChild(reasonBlock);
     }
+
+    judgmentQ.options.forEach(function (opt) {
+      var isSelected = existing.judgment === opt.id;
+      var row = el("label", { class: "option-row" + (isSelected ? " selected" : "") });
+      var input = el("input", { type: "radio", name: judgmentQ.id });
+      input.checked = isSelected;
+      input.addEventListener("change", function () {
+        existing.judgment = opt.id;
+        // Switching judgment discards any previously chosen reason tags —
+        // the real/ai option sets are different, so an old tag id
+        // wouldn't correspond to any visible option under the new set.
+        existing.reasonTags = [];
+        section4Responses[section4Cursor] = existing;
+        judgmentRows.forEach(function (r) { r.row.classList.toggle("selected", r.optId === opt.id); });
+        updateContinueDisabled(!existing.judgment);
+        renderReasonBlock(); // rebuilds ONLY reasonContainer's contents — stimulus box is untouched
+      });
+      row.appendChild(input);
+      row.appendChild(text(tr(opt.label) || opt.label));
+      judgmentRows.push({ row: row, optId: opt.id });
+      judgmentList.appendChild(row);
+    });
+    judgmentBlock.appendChild(judgmentList);
+    root.appendChild(judgmentBlock);
+
+    root.appendChild(reasonContainer);
+    renderReasonBlock(); // initial render — matches any pre-existing answer when revisiting via Back
 
     // Back is always shown now — the history stack correctly handles
     // cursor 0 (returns to section4_intro) as well as every later item
