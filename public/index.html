@@ -203,8 +203,15 @@
     demographics: {},
     section2: {},
     section3: { trust: {}, newsSource: [] },
-    section5: { everEncountered: null, platforms: [] },
-    section6: { trustChange: {}, openNarrative: "" },
+    section5: {
+      recentFalseContent: null,
+      affectedYou: null,
+      affectedNarrative: "",
+      aiInvolved: null,
+      everSuspectedAI: null,
+      platforms: [],
+    },
+    section6: { trustChange: {} },
     section7: { finalComment: "" },
   };
   var stimuliItems = [];
@@ -212,8 +219,8 @@
   var section4Cursor = 0;
 
   var STEPS = ["language", "age", "consent", "section1", "section2", "section3",
-    "section4_intro", "section4_item", "section5_ever", "section5_platforms",
-    "section6_trust", "section6_narrative", "section7", "submitting", "done"];
+    "section4_intro", "section4_item", "section5_intro", "section5_main",
+    "section6_trust", "section7", "submitting", "done"];
   var stepIndex = 0;
 
   // -----------------------------------------------------------------
@@ -253,7 +260,7 @@
     historyStack.push(snapshotState());
     section4Cursor++;
     if (section4Cursor >= stimuliItems.length) {
-      stepIndex = STEPS.indexOf("section5_ever");
+      stepIndex = STEPS.indexOf("section5_intro");
     }
     render();
   }
@@ -816,45 +823,109 @@
   }
 
   // ---------------------------------------------------------------
-  // Section 5 — Exposure (simplified: one yes/no gate, one conditional
-  // platform multi-select — no per-category matrix or follow-ups)
+  // Section 5 — Exposure & Unattributed Harm. 5.1-5.6 all live on ONE
+  // screen (screenSection5Main), with sub-questions conditionally
+  // revealed/hidden as earlier answers on that SAME screen change —
+  // unlike every other multi-part section, these are not separate
+  // steps in STEPS. Every option click here still calls the normal
+  // shared render() (unlike Section 4's judgment/reason clicks), which
+  // is fine: this screen has no stimulus media/network-fetched/
+  // stateful content to preserve, so a full re-render on each click is
+  // exactly the same safe, simple pattern used by every other
+  // multi-question screen (e.g. screenSection1) — the only difference
+  // is that here, which blocks get rendered varies with prior answers.
   // ---------------------------------------------------------------
-  function screenSection5Ever(root) {
+  function screenSection5Intro(root) {
     var sec = CONFIG.section5;
     root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
     root.appendChild(el("h2", {}, [text(tr(sec.title))]));
-    renderSingleChoice(root, sec.everEncountered, answers.section5.everEncountered, function (v) { answers.section5.everEncountered = v; });
+    root.appendChild(el("p", { class: "lead" }, [text(tr(sec.instructions))]));
+    navButtons(root, { showBack: true });
+  }
+
+  function screenSection5Main(root) {
+    var sec = CONFIG.section5;
+    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
+    root.appendChild(el("h2", {}, [text(tr(sec.title))]));
+
+    function isDisabled() {
+      if (!answers.section5.recentFalseContent) return true;
+      if (answers.section5.recentFalseContent === "yes") {
+        if (!answers.section5.affectedYou) return true;
+        if (answers.section5.affectedYou === "yes") {
+          if (!answers.section5.affectedNarrative || !answers.section5.affectedNarrative.trim()) return true;
+          if (!answers.section5.aiInvolved) return true;
+        }
+      }
+      if (!answers.section5.everSuspectedAI) return true;
+      if (answers.section5.everSuspectedAI === "yes") {
+        if (!answers.section5.platforms || answers.section5.platforms.length === 0) return true;
+      }
+      return false;
+    }
+
+    // 5.1 — always shown
+    renderSingleChoice(root, sec.recentFalseContent, answers.section5.recentFalseContent, function (v) {
+      answers.section5.recentFalseContent = v;
+      // Backing out of "yes" here makes 5.2/5.3/5.4 disappear again —
+      // clear their answers too, so a stale value from an abandoned
+      // "yes" path can never silently end up in the submission.
+      if (v !== "yes") {
+        answers.section5.affectedYou = null;
+        answers.section5.affectedNarrative = "";
+        answers.section5.aiInvolved = null;
+      }
+    });
+
+    // 5.2 — shown only if 5.1 === "yes"
+    if (answers.section5.recentFalseContent === "yes") {
+      renderSingleChoice(root, sec.affectedYou, answers.section5.affectedYou, function (v) {
+        answers.section5.affectedYou = v;
+        if (v !== "yes") {
+          answers.section5.affectedNarrative = "";
+          answers.section5.aiInvolved = null;
+        }
+      });
+
+      // 5.3 + 5.4 — shown only if 5.2 === "yes"
+      if (answers.section5.affectedYou === "yes") {
+        renderLongText(root, sec.affectedNarrative, answers.section5.affectedNarrative, function (v) {
+          answers.section5.affectedNarrative = v;
+        }, function () {
+          updateContinueDisabled(isDisabled());
+        });
+        renderSingleChoice(root, sec.aiInvolved, answers.section5.aiInvolved, function (v) { answers.section5.aiInvolved = v; });
+      }
+    }
+
+    // 5.5 — always shown
+    renderSingleChoice(root, sec.everSuspectedAI, answers.section5.everSuspectedAI, function (v) {
+      answers.section5.everSuspectedAI = v;
+      if (v !== "yes") {
+        answers.section5.platforms = [];
+      }
+    });
+
+    // 5.6 — shown only if 5.5 === "yes"
+    if (answers.section5.everSuspectedAI === "yes") {
+      renderMultiChoice(root, sec.platformsEncountered, answers.section5.platforms, function (v) { answers.section5.platforms = v; });
+    }
+
     navButtons(root, {
       showBack: true,
-      disabled: !answers.section5.everEncountered,
+      disabled: isDisabled(),
       onNext: function () {
-        if (answers.section5.everEncountered === "no") {
-          // Per the latest question set revision: ONLY 6.1 (the
-          // trust-change matrix) is conditional on 5.1="yes" — 6.2 (the
-          // narrative) is unconditional and always compulsory, same as
-          // 5.2 (platforms) is conditional. So a "no" answer skips 5.2
-          // AND 6.1, but must still land on 6.2, not skip past it.
-          goToStep("section6_narrative");
-        } else {
-          goToStep("section5_platforms");
-        }
+        // Section 6 is now shown only if 5.2 (affectedYou) === "yes" OR
+        // 5.5 (everSuspectedAI) === "yes" — evaluated once here.
+        var showSection6 = answers.section5.affectedYou === "yes" || answers.section5.everSuspectedAI === "yes";
+        goToStep(showSection6 ? "section6_trust" : "section7");
       },
     });
   }
 
-  function screenSection5Platforms(root) {
-    var sec = CONFIG.section5;
-    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
-    renderMultiChoice(root, sec.platformsEncountered, answers.section5.platforms, function (v) { answers.section5.platforms = v; });
-    // Required: this screen only shows up after answering "yes" to
-    // having encountered suspected AI content, so at least one
-    // platform must apply — unlike Section 2's tools question, there's
-    // no legitimate "none apply" case here.
-    navButtons(root, { showBack: true, disabled: !answers.section5.platforms || answers.section5.platforms.length === 0 });
-  }
-
   // ---------------------------------------------------------------
-  // Section 6 — Consequences (trust-change matrix + required narrative)
+  // Section 6 — Consequences (just the trust-change matrix; the old
+  // 6.2 open-narrative question has been removed entirely)
   // ---------------------------------------------------------------
   function screenSection6Trust(root) {
     var sec = CONFIG.section6;
@@ -863,23 +934,6 @@
     renderMatrix(root, sec.trustChange, answers.section6.trustChange, function (v) { answers.section6.trustChange = v; });
     var missing = sec.trustChange.rows.some(function (row) { return !answers.section6.trustChange[row.id]; });
     navButtons(root, { showBack: true, disabled: missing });
-  }
-
-  function screenSection6Narrative(root) {
-    var sec = CONFIG.section6;
-    // The eyebrow is shown here (not just on screenSection6Trust) because
-    // this screen can now be reached directly — a "no" answer to 5.1
-    // skips straight here, bypassing screenSection6Trust entirely, so
-    // this can be the FIRST Section 6 screen a respondent sees. Same
-    // pattern already used by screenSection5Platforms for the same reason.
-    root.appendChild(el("div", { class: "section-eyebrow" }, [text(tr(sec.title))]));
-    function isDisabled() {
-      return sec.openNarrative.required && (!answers.section6.openNarrative || !answers.section6.openNarrative.trim());
-    }
-    renderLongText(root, sec.openNarrative, answers.section6.openNarrative, function (v) { answers.section6.openNarrative = v; }, function () {
-      updateContinueDisabled(isDisabled());
-    });
-    navButtons(root, { showBack: true, disabled: isDisabled() });
   }
 
   function screenSection7(root) {
@@ -991,10 +1045,9 @@
     section3: screenSection3,
     section4_intro: screenSection4Intro,
     section4_item: screenSection4Item,
-    section5_ever: screenSection5Ever,
-    section5_platforms: screenSection5Platforms,
+    section5_intro: screenSection5Intro,
+    section5_main: screenSection5Main,
     section6_trust: screenSection6Trust,
-    section6_narrative: screenSection6Narrative,
     section7: screenSection7,
     submitting: screenSubmitting,
     done: screenDone,
