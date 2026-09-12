@@ -1,8 +1,17 @@
 {
   "version": 2,
   "functions": {
-    "api/*.js": {
+    "api/get-config.js": {
       "maxDuration": 15
+    },
+    "api/get-stimuli-set.js": {
+      "maxDuration": 15
+    },
+    "api/submit.js": {
+      "maxDuration": 15
+    },
+    "api/export.js": {
+      "maxDuration": 60
     }
   }
 }
