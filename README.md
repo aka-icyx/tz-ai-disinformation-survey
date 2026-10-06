@@ -1,23 +1,18 @@
 # Tanzania AI-Generated Disinformation Survey
 
-A custom-built version of the questionnaire, replacing the Microsoft
-Forms plan. Built on the config-driven Vercel + Google Drive blueprint:
+A custom-built version of the questionnaire. Built on the config-driven Vercel + Google Drive blueprint:
 no server to manage, no database, browser-only editing/deploys, and
 Drive doubles as a human-browsable place to see raw responses.
 
-## What changed vs. the Microsoft Forms plan
+## What is included
 
-Building this from scratch removes two real limitations Forms had:
+Building this from scratch removes two real limitations:
 
-- **True per-respondent randomization.** Forms couldn't randomly draw
-  from a stimulus pool, so the earlier plan needed several pre-built
-  "parallel versions" distributed round-robin. This app draws a fresh
+- **True per-respondent randomization.** This app draws a fresh
   random set (1 item per difficulty tier per modality, authenticity
   randomized) for every single respondent, server-side, at request
   time.
-- **One set of bilingual content, not duplicated sections.** Forms
-  needed a fully duplicated English and Swahili copy of every section
-  because its branching works at a whole-question level. Here, all
+- **One set of bilingual content, not duplicated sections.** Here, all
   bilingual text lives once in `lib/survey-config.js` as `{en, sw}`
   pairs, and the frontend just swaps which key it reads based on the
   respondent's language choice — no duplication.
@@ -76,53 +71,44 @@ button").
 ```
 
 Nothing here is a shared, mutated file — every write is a brand-new
-file, so concurrent submissions during your ~2.5-week collection window
+file, so concurrent submissions during our 2-week collection window
 can't race or overwrite each other.
 
 ## Stimuli: producing the actual content
 
-You need **90 items total**: for text and audio, 30 in English + 30 in
+We had **90 items total**: for text and audio, 30 in English + 30 in
 Swahili (15 real + 15 AI each, split into 3 tiers of 5); for image, 30
 total (not language-split). Exact folder locations are in
 `STIMULI_FOLDER_GUIDE.md` — read that alongside this section.
 
 ### Text (30 English + 30 Swahili)
-1. Collect 15 authentic short passages (100–150 words) per language
+1. Collected 15 authentic short passages (100–150 words) per language
    from real Tanzanian sources (The Citizen, Daily News, Mwananchi) on
    ordinary, non-disinformation topics (business, sports, community
    events).
-2. Generate 15 AI passages per language with any general-purpose LLM
-   (ChatGPT, Claude, Gemini): *"Write a 100–150 word news-style article
-   in [English/Swahili] about [topic], in the style of a Tanzanian news
-   outlet. Do not mention that this is AI-generated."*
-3. Have 2–3 reviewers independently guess real-vs-AI on the full set;
-   sort into easy/medium/hard by how often they're correctly guessed.
-4. For Swahili, either generate directly in Swahili and have a fluent
-   speaker check naturalness, or translate a finalized English set with
-   a fluent reviewer — avoid relying on raw machine translation alone.
+2. Generated 15 AI passages per language with any general-purpose LLM
+   (ChatGPT, Claude, Gemini).
+3. Had 2–3 reviewers independently guess real-vs-AI on the full set;
+   sorted into easy/medium/hard by how often they're correctly guessed.
+4. For Swahili, we generated directly in Swahili and have a fluent
+   speaker check naturalness.
 
 ### Audio (30 English + 30 Swahili)
-1. Record or source 15 authentic short clips (15–30s) per language.
-2. Generate 15 AI voice clips per language with a multilingual
+1. Sourced 15 authentic short clips (15–30s) per language.
+2. Generated 15 AI voice clips per language with a multilingual
    voice-cloning/TTS tool that supports Swahili (e.g., ElevenLabs — used
    for African-context disinformation testing in Allen & Nehring,
-   2025). Use the same script content as the authentic clips so wording
+   2025). Used the same script content as the authentic clips so wording
    itself isn't a giveaway.
-3. Tier empirically, same method as text.
-4. Have a native Swahili speaker verify pronunciation/naturalness of
+3. Tiered empirically, same method as text.
+4. Had a native Swahili speaker verify pronunciation/naturalness of
    every Swahili AI clip.
 
 ### Image (30 total, not language-split)
-1. Collect 15 authentic photos of ordinary Tanzanian scenes (markets,
+1. Collected 15 authentic photos of ordinary Tanzanian scenes (markets,
    streets, public events) with clear usage rights.
-2. Generate 15 AI images with Midjourney, DALL-E, or Stable Diffusion:
-   *"A realistic photograph of [scene], Tanzania, natural lighting,
-   candid style."* Pick the most photorealistic result per prompt.
-3. Tier empirically, same method as above.
-
-Once tiered, drop files straight into the matching leaf folder under
-`public/stimuli/` per `STIMULI_FOLDER_GUIDE.md` — no code changes
-needed.
+2. Generated 15 AI images with DALL-E. Picked the most photorealistic result per prompt.
+3. Tiered empirically, same method as above.
 
 ## One-time setup
 
@@ -164,7 +150,7 @@ Everything is controlled by one flag: `meta.isOpen` in
 **To close it:**
 1. On GitHub, open `lib/survey-config.js` in the web editor.
 2. Change `isOpen: true,` to `isOpen: false,` (near the top, inside `meta`).
-3. Commit directly to `main`. If your Vercel project has auto-deploy on
+3. Commit directly to `main`. If Vercel project has auto-deploy on
    (the default when importing from GitHub), it redeploys automatically
    within about a minute; otherwise, trigger a redeploy from the Vercel
    dashboard.
@@ -184,12 +170,11 @@ flag).
 
 ## Using the admin export
 
-Once you have responses, download them as CSV:
+Once you have responses, they can be downloaded as CSV
 ```
 https://<your-vercel-app>.vercel.app/api/export?token=<ADMIN_EXPORT_TOKEN>
 ```
-This isn't linked anywhere in the survey UI — keep the token private,
-since anyone with it can download all response data.
+This isn't linked anywhere in the survey UI. The token is private.
 
 ## Known limitation worth knowing about
 
