@@ -1,6 +1,6 @@
 # Stimuli Folder Guide
 
-This is the **only** thing you need to touch to add or change Section 4
+This is the **only** thing needed to touch to add or change Section 4
 test content. Nothing in the code needs editing — `lib/stimuli.js` scans
 these folders at request time and automatically picks up whatever it
 finds.
@@ -33,13 +33,12 @@ That's **24 leaf folders** total (2 language × 2 authenticity × 3 tiers
 
 ## Rules
 
-1. **Put 5 files in each leaf folder.** The code will work with more or
+1. **5 files in each leaf folder.** The code will work with more or
    fewer, but 5-per-tier-per-authenticity is what the pool math in
    `lib/survey-config.js` (`section4.structure`) assumes, and is what
-   lets every participant's 3-per-modality draw feel non-repetitive
-   across a ~500-person, 2.5-week run.
+   lets every participant's 3-per-modality draw feel non-repetitive.
 2. **Filenames don't matter, only location.** `001.mp3`, `clip-a.mp3`,
-   `real_easy_1.mp3` — all fine. The code lists whatever's in the folder
+   `real_easy_1.mp3` are all fine. The code lists whatever's in the folder
    and picks randomly. Just don't leave stray files like `.DS_Store` in
    there (the loader already ignores a short list of known junk files,
    but avoid adding your own notes/readme files inside a leaf folder).
@@ -54,12 +53,8 @@ That's **24 leaf folders** total (2 language × 2 authenticity × 3 tiers
      (compress before uploading) since these are served directly to
      respondents' phones, some on limited data.
 4. **Image has no language subfolder.** Per the study design, images
-   are only split by `real`/`ai` and tier — not by language — unless an
-   image contains visible text (a sign, a screenshot, a caption). If you
-   do need a language-specific image, you'd need to extend the folder
-   convention and `lib/stimuli.js`'s `folderFor()`/`urlFor()` functions
-   accordingly — this isn't handled by the current structure.
-5. **Difficulty tiers should be assigned empirically, not guessed in
+   are only split by `real`/`ai` and tier — not by language.
+5. **Difficulty tiers assigned empirically, not guessed in
    advance.** Have 2–3 people independently judge real-vs-AI on your
    full candidate set before sorting into `easy`/`medium`/`hard` — items
    almost everyone gets right are `easy`, items most people misjudge are
